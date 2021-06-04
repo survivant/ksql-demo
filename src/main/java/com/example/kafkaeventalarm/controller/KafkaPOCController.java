@@ -1,11 +1,11 @@
 package com.example.kafkaeventalarm.controller;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.kafkaeventalarm.ksql.KSQLStreams;
 import com.example.kafkaeventalarm.model.Order;
 import com.example.kafkaeventalarm.producer.OrderProducer;
+import io.confluent.ksql.api.client.KsqlArray;
 import io.confluent.ksql.api.client.Row;
 
 @RestController
@@ -60,6 +61,27 @@ public class KafkaPOCController {
         }
 
         return map;
+    }
+
+    // retourne la derniere valeur de tous les items
+    // interactiveQuery
+    @GetMapping(value="/getOrdersValue")
+    public Collection<KsqlArray> getOrdersValue() throws ExecutionException, InterruptedException {
+        List<Row> rows = ksqlStreams.getOrdersValue();
+
+        ArrayList<KsqlArray> list = new ArrayList<>();
+        for (var row : rows) {
+            list.add(row.values());
+        }
+
+        return list;
+    }
+
+    //le cas où on update un message.. c'est la meme logique que de créer un nouveau Order, sauf que la cle primaire est fourni..mais dans ce POC.. aucune différence
+    @PostMapping(value = "updateOrder")
+    public void updateOrder(@RequestBody Order order){
+        // option 1 : utilise le producer
+        this.orderProducer.sendMessage(order);
     }
 
 }

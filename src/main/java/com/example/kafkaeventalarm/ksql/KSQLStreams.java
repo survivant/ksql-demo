@@ -79,6 +79,26 @@ public class KSQLStreams {
         {"STATUS":"yyy","COUNT":1,"WINDOW_START":"2021-06-03 17:57:00","WINDOW_END":"2021-06-03 17:58:00"}
          */
 
+
+
+        // ceci va créer une table qui va recevoir les updates du stream
+        sql = "CREATE TABLE ORDERS_VIEW WITH (KAFKA_TOPIC='ORDERS_VIEW', PARTITIONS=1, REPLICAS=1) AS SELECT\n" +
+                "  KSQLORDERS.ORDERID ORDERID,\n" +
+                "  LATEST_BY_OFFSET(KSQLORDERS.PRODUCT) PRODUCT,\n" +
+                "  LATEST_BY_OFFSET(KSQLORDERS.ORDERTIMESTAMP) ORDERTIMESTAMP,\n" +
+                "  LATEST_BY_OFFSET(KSQLORDERS.STATUS) STATUS\n" +
+                "FROM KSQLORDERS KSQLORDERS\n" +
+                "GROUP BY KSQLORDERS.ORDERID\n" +
+                "EMIT CHANGES;";
+
+        try {
+            result = client.executeStatement(sql, properties).get();
+            System.out.println("Query ID: " + result.queryId().orElse("<null>"));
+        } catch (Exception e) {
+            //e.printStackTrace();
+        }
+
+
         // exemple de Push query.. comme un Consumer de stream update.
         createPushQueries();
 
@@ -131,5 +151,28 @@ public class KSQLStreams {
             System.out.println("MESSAGE2 RECEIVED = " + objectMap);
 
         });
+
+        // will return
+        /*
+        {STATUS=bbb, COUNT=10}
+        {STATUS=bbb, COUNT=11}
+        {STATUS=bbb, COUNT=13}
+         */
+        ksqlDbStreamingQuery.query("select * from ORDERS_VIEW emit changes;", (row)->{
+            Map<String, Object> objectMap = row.asObject().getMap();
+
+            System.out.println("MESSAGE3 RECEIVED = " + objectMap);
+
+        });
+    }
+
+    public List<Row> getOrdersValue() throws ExecutionException, InterruptedException {
+        Map<String, Object> properties = new HashMap();
+        properties.put("auto.offset.reset", "earliest");
+        properties.put("ksql.query.pull.table.scan.enabled", Boolean.TRUE);
+
+        String sql = "select * from ORDERS_VIEW;";
+        var batchedQueryResult = client.executeQuery(sql, properties);
+        return batchedQueryResult.get();
     }
 }
